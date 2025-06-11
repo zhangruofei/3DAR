@@ -80,7 +80,7 @@
 
   <!-- AR场景配置 -->
   <a-scene
-    mindar-image="imageTargetSrc: ./qianfo.mind; autoStart: false; filterMinCF: 0.0005; filterBeta: 1500; warmupTolerance: 3; missTolerance: 3"
+    mindar-image="imageTargetSrc: ./qianfo.mind; autoStart: false; filterMinCF: 0.0001; filterBeta: 1000; warmupTolerance: 3; missTolerance: 10"
     color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
 
@@ -117,8 +117,10 @@
 
 
       <!-- 石窟模型 - 添加clickable类使其可点击 -->
-      <a-gltf-model id="caveModel3D" src="#caveModel" position="0 0 0" scale="0.8 0.8 0.8" visible="false"
-        class="clickable" animation="property: rotation; to: 0 360 0; loop: true; dur: 60000; easing: linear">
+      <a-gltf-model id="caveModel3D" src="#caveModel" position="0 0 0" scale="0.1 0.1 0.1" visible="false"
+        class="clickable" animation-mixer="clip: *; loop: repeat; crossFadeDuration: 0.5"
+        animation__scale="property: scale; from: 0.1 0.1 0.1; to: 0.6 0.6 0.6; dur: 8000; easing: easeOutElastic; autoplay: false"
+        animation__rotation="property: rotation; to: 0 360 0; loop: true; dur: 60000; easing: linear; autoplay: false">
       </a-gltf-model>
 
       <!-- sedu视频播放  -->
@@ -588,7 +590,50 @@
                 // 同时显示石窟模型
                 if (caveModel) {
                   caveModel.setAttribute('visible', 'true');
-                  console.log('🏛️ 石窟模型已显示');
+                  // 启动缩放动画
+                  caveModel.components.animation__scale.beginAnimation();
+                  // 启动旋转动画
+                  caveModel.components.animation__rotation.beginAnimation();
+
+                  // 启动GLTF模型内部动画
+                  const animationMixer = caveModel.components['animation-mixer'];
+                  if (animationMixer && animationMixer.mixer) {
+                    // 尝试播放所有可用的动画剪辑
+                    if (animationMixer.mixer._actions && animationMixer.mixer._actions.length > 0) {
+                      animationMixer.mixer._actions.forEach((action, index) => {
+                        action.paused = false;
+                        action.play();
+                        console.log(`🎭 播放动画剪辑 ${index + 1}:`, action._clip.name);
+                      });
+                    } else {
+                      // 如果没有预加载的actions，尝试直接从clips创建并播放
+                      const clips = animationMixer.mixer._root.animations;
+                      if (clips && clips.length > 0) {
+                        clips.forEach((clip, index) => {
+                          const action = animationMixer.mixer.clipAction(clip);
+                          action.loop = THREE.LoopRepeat;
+                          action.play();
+                          console.log(`🎭 创建并播放动画剪辑 ${index + 1}:`, clip.name);
+                        });
+                      }
+                    }
+                    console.log('🎭 石窟模型内部动画启动完成');
+                  } else {
+                    console.log('⚠️ 未找到动画混合器组件，稍后重试');
+                    // 延迟重试启动动画
+                    setTimeout(() => {
+                      const retryMixer = caveModel.components['animation-mixer'];
+                      if (retryMixer && retryMixer.mixer && retryMixer.mixer._actions.length > 0) {
+                        retryMixer.mixer._actions.forEach(action => {
+                          action.paused = false;
+                          action.play();
+                        });
+                        console.log('🎭 延迟启动动画成功');
+                      }
+                    }, 1000);
+                  }
+
+                  console.log('🏛️ 石窟模型已显示，动画开始');
                 }
 
                 // 同时显示并启动龙的动画
@@ -661,6 +706,17 @@
 
             if (caveModel) caveModel.setAttribute('visible', 'false');
             if (dragonModel) dragonModel.setAttribute('visible', 'false');
+
+            // 暂停石窟模型的内部动画
+            if (caveModel) {
+              const animationMixer = caveModel.components['animation-mixer'];
+              if (animationMixer && animationMixer.mixer && animationMixer.mixer._actions) {
+                animationMixer.mixer._actions.forEach(action => {
+                  action.paused = true;
+                });
+                console.log('⏸️ 石窟模型动画已暂停');
+              }
+            }
           });
         }
       }
@@ -670,6 +726,20 @@
       models.forEach(model => {
         model.addEventListener('model-loaded', function () {
           console.log('模型加载完成:', model.id);
+
+          // 特别处理石窟模型，确保动画组件初始化
+          if (model.id === 'caveModel3D') {
+            const animationMixer = model.components['animation-mixer'];
+            if (animationMixer) {
+              console.log('🎭 石窟模型动画组件已初始化');
+              // 暂停动画，等待目标检测时再播放
+              if (animationMixer.mixer && animationMixer.mixer._actions.length > 0) {
+                animationMixer.mixer._actions.forEach(action => {
+                  action.paused = true;
+                });
+              }
+            }
+          }
         });
 
         model.addEventListener('model-error', function (event) {
