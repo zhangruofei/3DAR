@@ -9,6 +9,8 @@
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <!-- A-Frame扩展组件 -->
   <script src="https://cdn.jsdelivr.net/gh/n5ro/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+  <script src="https://unpkg.com/aframe-event-set-component@5.x.x/dist/aframe-event-set-component.min.js"></script>
+
   <style>
     .loading-text {
       position: fixed;
@@ -77,8 +79,9 @@
   <div class="loading-text">正在加载场景...</div>
 
   <!-- AR场景配置 -->
-  <a-scene mindar-image="imageTargetSrc: ./qianfo.mind; autoStart: false" color-space="sRGB"
-    renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
+  <a-scene
+    mindar-image="imageTargetSrc: ./qianfo.mind; autoStart: false; filterMinCF: 0.0005; filterBeta: 1500; warmupTolerance: 3; missTolerance: 3"
+    color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
 
     <!-- 资源预加载 -->
@@ -86,17 +89,15 @@
       <!-- 石窟3D模型 -->
       <a-asset-item id="caveModel" src="./buddhist.glb"></a-asset-item>
 
-      <!-- 祥云模型（如果有） -->
-      <a-asset-item id="cloudModel" src="./cloud.glb"></a-asset-item>
-
-      <!-- 龙模型（如果有） -->
-      <a-asset-item id="dragonModel" src="./dragon.glb"></a-asset-item>
 
 
 
       <!-- sedu视频 - 循环播放 -->
-      <video id="seduVideo" src="./sedu.mp4" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline
+      <video id="seduVideo" src="./sedu1.mp4" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline
         loop="false"></video>
+
+      <video id="seduVideo2" src="./sedu.mp4" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline
+        loop="true"></video>
 
       <!-- 音效资源 -->
       <audio id="chantAudio" src="./chant.mp3" preload="auto"></audio>
@@ -105,29 +106,32 @@
     </a-assets>
 
     <!-- 摄像头配置 -->
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false; rayOrigin: mouse;"
+      raycaster="near: 10; far: 10000; objects: .clickable">
+
+    </a-camera>
 
     <!-- 图像目标实体 - 当识别到千佛洞标记时显示的内容 -->
     <a-entity mindar-image-target="targetIndex: 0">
 
 
 
-      <!-- sedu视频播放 - 循环播放 -->
+      <!-- 石窟模型 - 添加clickable类使其可点击 -->
+      <a-gltf-model id="caveModel3D" src="#caveModel" position="0 0 0" scale="0.8 0.8 0.8" visible="false"
+        class="clickable" animation="property: rotation; to: 0 360 0; loop: true; dur: 60000; easing: linear">
+      </a-gltf-model>
+
+      <!-- sedu视频播放  -->
       <a-video id="seduVideoPlane" src="#seduVideo" width="2" height="2" position="0 0 -0.3" transparent="true"
         color="#ffffff" opacity="1" visible="false" chroma-key="keyColor: #00ff00; threshold: 0.18; smoothing: 0.04">
       </a-video>
 
+      <!-- sedu视频播放  -->
+      <a-video id="seduVideoPlane2" src="#seduVideo2" width="2" height="2" position="0 1 -1" transparent="true"
+        color="#ffffff" opacity="1" visible="false" chroma-key="keyColor: #00ff00; threshold: 0.18; smoothing: 0.04">
+      </a-video>
 
-      <!-- 石窟模型 -->
-      <a-gltf-model id="caveModel3D" src="#caveModel" position="0 0 0" scale="1 1 1"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000" visible="false">
-      </a-gltf-model>
 
-      <!-- 龙的飞舞效果（如果有GLB） -->
-      <a-gltf-model id="dragon" src="#dragonModel" position="1 1 0" scale="0.2 0.2 0.2" opacity="0" animation-mixer
-        animation__fly="property: position; to: -1 1 0; dur: 5000; dir: alternate; loop: true; easing: easeInOutQuad"
-        animation__fadein="property: opacity; from: 0; to: 1; dur: 2000; delay: 3000" visible="false">
-      </a-gltf-model>
 
     </a-entity>
 
@@ -137,57 +141,6 @@
     // ================================================
     // JavaScript控制逻辑
     // ================================================
-
-    // Three.js扩展功能 - 粒子系统组件
-    AFRAME.registerComponent('particle-system', {
-      init: function () {
-        const el = this.el;
-        const scene = el.sceneEl.object3D;
-
-        // 创建粒子系统
-        const particleCount = 100;
-        const particles = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        const colors = new Float32Array(particleCount * 3);
-
-        for (let i = 0; i < particleCount; i++) {
-          positions[i * 3] = (Math.random() - 0.5) * 2;
-          positions[i * 3 + 1] = Math.random() * 2;
-          positions[i * 3 + 2] = (Math.random() - 0.5) * 2;
-
-          colors[i * 3] = 1;
-          colors[i * 3 + 1] = 0.84;
-          colors[i * 3 + 2] = 0;
-        }
-
-        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-        const material = new THREE.PointsMaterial({
-          size: 0.05,
-          vertexColors: true,
-          transparent: true,
-          opacity: 0.8,
-          blending: THREE.AdditiveBlending
-        });
-
-        this.particleSystem = new THREE.Points(particles, material);
-        el.object3D.add(this.particleSystem);
-      },
-
-      tick: function (time) {
-        if (this.particleSystem) {
-          this.particleSystem.rotation.y = time * 0.0001;
-          const positions = this.particleSystem.geometry.attributes.position.array;
-
-          for (let i = 0; i < positions.length; i += 3) {
-            positions[i + 1] += Math.sin(time * 0.001 + i) * 0.001;
-          }
-
-          this.particleSystem.geometry.attributes.position.needsUpdate = true;
-        }
-      }
-    });
 
     // 色度抠图组件 - 实现绿幕抠像效果
     AFRAME.registerComponent('chroma-key', {
@@ -452,6 +405,9 @@
             console.log('📝 如果绿色残留可稍微减少 threshold 值');
           }
         };
+
+        console.log('🛠️ 调试工具已加载');
+        console.log('💡 使用 adjustChromaKey(threshold, smoothing) 来调整抠图参数');
       }
     });
 
@@ -548,12 +504,11 @@
         }
       });
 
+
+
       // 场景设置函数
       function setupScene() {
         const targetEntity = document.querySelector('[mindar-image-target]');
-
-        // 添加粒子系统
-        targetEntity.setAttribute('particle-system', '');
 
         // 色度视频播放控制
         const seduVideo = document.getElementById('seduVideo');
@@ -563,6 +518,8 @@
         if (seduVideoPlane) {
           seduVideoPlane.setAttribute('visible', 'false');
         }
+
+
 
         if (targetEntity) {
           // 目标检测事件 - 当发现标记图像时触发
@@ -597,19 +554,44 @@
 
               // 监听视频播放结束事件
               seduVideo.onended = function () {
-                console.log('🎬 透明视频播放完毕，显示模型');
+                console.log('🎬 第一个视频播放完毕，开始第二阶段：播放第二个视频并显示模型');
 
-                // 隐藏视频
+                // 隐藏第一个视频
                 seduVideoPlane.setAttribute('visible', 'false');
 
-                // 显示石窟模型
+                // 同时启动第二个视频和显示模型
+                const seduVideo2 = document.getElementById('seduVideo2');
+                const seduVideoPlane2 = document.getElementById('seduVideoPlane2');
                 const caveModel = document.getElementById('caveModel3D');
-                if (caveModel) {
-                  caveModel.setAttribute('visible', 'true');
+                const dragonModel = document.getElementById('dragon');
+
+                // 播放第二个视频
+                if (seduVideo2 && seduVideoPlane2) {
+                  console.log('🎬 开始播放第二个视频');
+
+                  // 显示第二个视频
+                  seduVideoPlane2.setAttribute('visible', 'true');
+
+                  // 设置音量和取消静音
+                  seduVideo2.muted = false;
+                  seduVideo2.volume = 0.8;
+
+                  // 重置播放时间并播放
+                  seduVideo2.currentTime = 0;
+                  seduVideo2.play().then(() => {
+                    console.log('✅ 第二个视频播放成功');
+                  }).catch(error => {
+                    console.error('❌ 第二个视频播放失败:', error);
+                  });
                 }
 
-                // 显示并启动龙的动画
-                const dragonModel = document.getElementById('dragon');
+                // 同时显示石窟模型
+                if (caveModel) {
+                  caveModel.setAttribute('visible', 'true');
+                  console.log('🏛️ 石窟模型已显示');
+                }
+
+                // 同时显示并启动龙的动画
                 if (dragonModel) {
                   dragonModel.setAttribute('visible', 'true');
                   dragonModel.setAttribute('opacity', '0');
@@ -617,7 +599,7 @@
                     'property: opacity; from: 0; to: 1; dur: 2000; delay: 1000');
                 }
 
-                // 播放音效
+                // 同时播放音效
                 if (magicSound) {
                   magicSound.currentTime = 0;
                   magicSound.play().catch(e => console.log('魔法音效播放失败:', e));
@@ -652,22 +634,30 @@
             if (chantAudio) chantAudio.pause();
             if (magicSound) magicSound.pause();
 
-            // 暂停色度视频
+            // 暂停并隐藏第一个视频
             const seduVideo = document.getElementById('seduVideo');
             const seduVideoPlane = document.getElementById('seduVideoPlane');
             if (seduVideo) {
               seduVideo.pause();
-              console.log('⏸️ 色度视频已暂停');
+              console.log('⏸️ 第一个视频已暂停');
             }
             if (seduVideoPlane) {
               seduVideoPlane.setAttribute('visible', 'false');
             }
 
-
+            // 暂停并隐藏第二个视频
+            const seduVideo2 = document.getElementById('seduVideo2');
+            const seduVideoPlane2 = document.getElementById('seduVideoPlane2');
+            if (seduVideo2) {
+              seduVideo2.pause();
+              console.log('⏸️ 第二个视频已暂停');
+            }
+            if (seduVideoPlane2) {
+              seduVideoPlane2.setAttribute('visible', 'false');
+            }
 
             const caveModel = document.getElementById('caveModel3D');
             const dragonModel = document.getElementById('dragon');
-
 
             if (caveModel) caveModel.setAttribute('visible', 'false');
             if (dragonModel) dragonModel.setAttribute('visible', 'false');
